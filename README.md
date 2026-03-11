@@ -7,7 +7,7 @@
 
 <h1 align="center">PackGuard</h1>
 
-<p align="center"><img width="363" height="380" alt="untitled" src="https://github.com/user-attachments/assets/6eed0d38-e628-4f5b-a375-b873f5902236" />
+<p align="center"><img width="165" height="180" alt="untitled" src="https://github.com/user-attachments/assets/6eed0d38-e628-4f5b-a375-b873f5902236" />
 
   A reverse proxy for Minecraft Bedrock Edition that detects and blocks resource pack ripping tools.<br/>
   Sits between players and your server, inspects the login handshake and in-game packet stream,<br/>
