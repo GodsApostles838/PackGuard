@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packetguard banner.png" alt="PackGuard" width="600"/>
+  ---<img width="838" height="223" alt="packetguard banner" src="https://github.com/user-attachments/assets/6af9b505-e0a7-44c3-8fdb-4fac5bf598d1" />
 </p>
 
 <p align="center">
@@ -18,9 +18,10 @@
   Built on <a href="https://github.com/sandertv/gophertunnel">gophertunnel</a> · GUI &amp; headless · Docker-ready
 </p>
 
----
 
-<h2>🔴 The Problem</h2>
+
+
+<h2>The Problem</h2>
 
 Bedrock clients receive resource packs during the login handshake. Tools like **bedrocktool** exploit this by using gophertunnel to complete the handshake, download pack data (including content keys from `TexturePackInfo`), and disconnect. To the server, it looks like a normal player that left early.
 
@@ -28,7 +29,7 @@ Bedrock clients receive resource packs during the login handshake. Tools like **
 
 ---
 
-<h2>🔴 Architecture</h2>
+<h2>Architecture</h2>
 
 ```
                          ┌──────────────────────┐
@@ -49,7 +50,7 @@ Bedrock clients receive resource packs during the login handshake. Tools like **
 
 ---
 
-<h2>🔴 Detection Layers</h2>
+<h2>Detection Layers</h2>
 
 | # | Stage | Detection |
 |:---:|---|---|
@@ -225,7 +226,7 @@ Generates unique 32-byte AES-256 content keys per session via `crypto/rand`. Eve
 
 ---
 
-<h2>🔴 Quick Start</h2>
+<h2>Quick Start</h2>
 
 ### Build
 
@@ -291,7 +292,7 @@ log:
 
 ---
 
-<h2>🔴 Running</h2>
+<h2>Running</h2>
 
 ### Headless
 
@@ -343,7 +344,7 @@ Point `listen` to the port players connect on. Point `backend.address` to your B
 
 ---
 
-<h2>🔴 Flags</h2>
+<h2>Flags</h2>
 
 ```
 -headless       Run without GUI
@@ -353,7 +354,7 @@ Point `listen` to the port players connect on. Point `backend.address` to your B
 
 ---
 
-<h2>🔴 Logging</h2>
+<h2>Logging</h2>
 
 All events are written as JSON Lines to the configured log file:
 
@@ -371,7 +372,7 @@ All events are written as JSON Lines to the configured log file:
 
 ---
 
-<h2>🔴 Project Structure</h2>
+<h2>Project Structure</h2>
 
 ```
 packguard/
