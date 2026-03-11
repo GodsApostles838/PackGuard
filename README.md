@@ -33,18 +33,18 @@ Bedrock clients receive resource packs during the login handshake. Tools like **
 
 ```
                          ┌──────────────────────┐
-                         │     PACKGUARD         │
-                         │     Reverse Proxy     │
-  ┌──────────┐           │                       │           ┌──────────┐
-  │  Player  │ ────────► │  L1  Fingerprint      │           │  Bedrock │
-  │ (Client) │   :19132  │  L2  URL Strip        │           │Dedicated │
-  └──────────┘           │  L3  Rate Limit       │ ────────► │  Server  │
-                         │  L4  Grab Detect      │           │  :19133  │
-  ┌──────────┐           │  L5  XUID Rep         │           └──────────┘
-  │  Ripper  │ ────X     │  L6  Max Conns        │
-  │  (Tool)  │  BLOCKED  │  L7  Behavior         │
-  └──────────┘           │  L8  Encryption        │
-                         │  L9  Post-Session      │
+                         │     PACKGUARD        │
+                         │     Reverse Proxy    │
+  ┌──────────┐           │                      │           ┌──────────┐
+  │  Player  │ ────────► │  L1  Fingerprint     │           │  Bedrock │
+  │ (Client) │   :19132  │  L2  URL Strip       │           │Dedicated │
+  └──────────┘           │  L3  Rate Limit      │ ────────► │  Server  │
+                         │  L4  Grab Detect     │           │  :19133  │
+  ┌──────────┐           │  L5  XUID Rep        │           └──────────┘
+  │  Ripper  │ ────X     │  L6  Max Conns       │
+  │  (Tool)  │  BLOCKED  │  L7  Behavior        │
+  └──────────┘           │  L8  Encryption      │
+                         │  L9  Post-Session    │
                          └──────────────────────┘
 ```
 
