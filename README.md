@@ -1,5 +1,5 @@
 <p align="center">
-  ---<img width="838" height="223" alt="packetguard banner" src="https://github.com/user-attachments/assets/6af9b505-e0a7-44c3-8fdb-4fac5bf598d1" />
+  <img width="838" height="223" alt="packetguard banner" src="https://github.com/user-attachments/assets/6af9b505-e0a7-44c3-8fdb-4fac5bf598d1" />
 </p>
 
 <p align="center">
