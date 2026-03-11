@@ -32,12 +32,12 @@ PackGuard proxies every connection and applies **9 layers of detection** before,
                          +----------------------+
                          |   PackGuard          |
                          |   Reverse Proxy      |
-  +----------+           |                      |        +----------+
-  |  Player  | --------> | Layer 1: Fingerprint |        |  Bedrock |
-  | (Client) |  :19132   | Layer 2: URL Strip   |        | Dedicated|
-  +----------+           | Layer 3: Rate Limit  |        |  Server  |
-                         | Layer 4: Grab Detect -------> |  :19133  |
-  +----------+           | Layer 5: XUID Rep    |        +----------+
+  +----------+           |                      |        +-----------+
+  |  Player  | --------> | Layer 1: Fingerprint |        |  Bedrock  |
+  | (Client) |  :19132   | Layer 2: URL Strip   |        | Dedicated |
+  +----------+           | Layer 3: Rate Limit  |        |  Server   |
+                         | Layer 4: Grab Detect -------> |  :19133   |
+  +----------+           | Layer 5: XUID Rep    |        +-----------+
   |  Ripper  | ----X     | Layer 6: Max Conns   |
   |  (Tool)  |  BLOCKED  | Layer 7: Behavior    |
   +----------+           | Layer 8: Encryption  |
