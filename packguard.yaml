@@ -1,0 +1,20 @@
+listen: "0.0.0.0:19133"
+auth_disabled: true
+
+backend:
+  address: "127.0.0.1:19134"
+
+detection:
+  threshold: 3.0
+  block_on_detect: true
+  disconnect_message: "Unable to connect to server. Please try again later."
+  rate_limit: 5
+  max_connections: 100
+  repeat_block_count: 3
+  grab_disconnect_timeout: 30
+  whitelist:
+    # - "2535416XXXXXXXXX"
+
+log:
+  file: "packguard.log"
+  verbose: false

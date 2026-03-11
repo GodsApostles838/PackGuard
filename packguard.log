@@ -1,0 +1,15 @@
+[ALLOWED] 2026-03-11T05:09:20Z | user:ParnCoolioXD xuid:2535464220392818 ip:192.168.1.41 os:Win32 model:B550 AORUS ELITE AX V2 Gigabyte Technology Co., Ltd. (Unknown)
+[ALLOWED] 2026-03-11T05:10:31Z | user:GodsApostles838 xuid:2535459484320096 ip:192.168.1.12 os:Win32 model:MS-7D36 Micro-Star International Co., Ltd. (Unknown)
+[ALLOWED] 2026-03-11T05:11:12Z | user:FoolioCoolio25 xuid:2535426046873680 ip:192.168.1.41 os:Android model:SM-G970F
+[ALLOWED] 2026-03-11T05:12:16Z | user:FoolioCoolio25 xuid:2535426046873680 ip:192.168.1.41 os:Android model:SM-G970F
+[BLOCKED] 2026-03-11T05:16:03Z | user:FoolioCoolio25 xuid:2535426046873680 ip: score:3.0 signals:UI Profile(+2.0),Platform ID(+1.0)
+[ALLOWED] 2026-03-11T05:16:23Z | user:GodsApostles838 xuid:2535459484320096 ip:192.168.1.12 os:Win32 model:MS-7D36 Micro-Star International Co., Ltd. (Unknown)
+[ALLOWED] 2026-03-11T05:17:15Z | user:ParnCoolioXD xuid:2535464220392818 ip:192.168.1.41 os:Win32 model:B550 AORUS ELITE AX V2 Gigabyte Technology Co., Ltd. (Unknown)
+[BLOCKED] 2026-03-11T05:18:16Z | user:FoolioCoolio25 xuid:2535426046873680 ip: score:3.0 signals:UI Profile(+2.0),Platform ID(+1.0)
+{"ts":"2026-03-11T05:48:19Z","event":"blocked","user":"FoolioCoolio25","xuid":"2535426046873680","score":3,"signals":["UI Profile","Platform ID"],"os":"Android","model":"SM-G970F"}
+{"ts":"2026-03-11T05:56:36Z","event":"blocked","user":"FoolioCoolio25","xuid":"2535426046873680","score":3,"signals":["UI Profile","Platform ID"],"os":"Android","model":"SM-G970F"}
+{"ts":"2026-03-11T06:06:11Z","event":"blocked","user":"FoolioCoolio25","xuid":"2535426046873680","score":5,"signals":["UI Profile","Platform ID","Trusted Skin","Memory Tier"],"os":"Android","model":"SM-G970F"}
+{"ts":"2026-03-11T06:07:53Z","event":"blocked","user":"FoolioCoolio25","xuid":"2535426046873680","score":5,"signals":["UI Profile","Platform ID","Trusted Skin","Memory Tier"],"os":"Android","model":"SM-G970F"}
+{"ts":"2026-03-11T06:17:16Z","event":"blocked","user":"FoolioCoolio25","xuid":"2535426046873680","score":5,"signals":["UI Profile","Platform ID","Trusted Skin","Memory Tier"],"os":"Android","model":"SM-G970F"}
+{"ts":"2026-03-11T06:20:29Z","event":"error","message":"backend dial failed for GodsApostles838: dial minecraft 127.0.0.1:55158-\u003e127.0.0.1:19134: context canceled"}
+{"ts":"2026-03-11T07:05:17Z","event":"blocked","user":"FoolioCoolio25","xuid":"2535426046873680","score":5,"signals":["UI Profile","Platform ID","Trusted Skin","Memory Tier"],"os":"Android","model":"SM-G970F"}
