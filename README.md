@@ -1,5 +1,6 @@
 <p align="center">
-  <img src="packetguard banner.png" alt="PackGuard" width="600"/>
+
+  <img width="838" height="223" alt="packetguard banner" src="https://github.com/user-attachments/assets/7d55d330-183d-463b-8a4b-68c79477291f" />
 </p>
 
 <p align="center">
@@ -19,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GodsApostles838/PackGuard/wiki"><img src="https://img.shields.io/badge/Wiki-Documentation-EF4444?style=for-the-badge" alt="Wiki"/></a>
+  <a href="https://github.com/GodsApostles838/PackGuard/wiki"><img src="https://img.shields.io/badge/Wiki-Click_Me-EF4444?style=for-the-badge" alt="Wiki"/></a>
 </p>
 
 ---
@@ -36,18 +37,18 @@ Bedrock clients receive resource packs during the login handshake. Tools like **
 
 ```
                          ┌──────────────────────┐
-                         │     PACKGUARD         │
-                         │     Reverse Proxy     │
-  ┌──────────┐           │                       │           ┌──────────┐
-  │  Player  │ ────────► │  L1  Fingerprint      │           │  Bedrock │
-  │ (Client) │   :19132  │  L2  URL Strip        │           │Dedicated │
-  └──────────┘           │  L3  Rate Limit       │ ────────► │  Server  │
-                         │  L4  Grab Detect      │           │  :19133  │
-  ┌──────────┐           │  L5  XUID Rep         │           └──────────┘
-  │  Ripper  │ ────X     │  L6  Max Conns        │
-  │  (Tool)  │  BLOCKED  │  L7  Behavior         │
-  └──────────┘           │  L8  Encryption        │
-                         │  L9  Post-Session      │
+                         │     PACKGUARD        │
+                         │     Reverse Proxy    │
+  ┌──────────┐           │                      │           ┌──────────┐
+  │  Player  │ ────────► │  L1  Fingerprint     │           │  Bedrock │
+  │ (Client) │   :19132  │  L2  URL Strip       │           │Dedicated │
+  └──────────┘           │  L3  Rate Limit      │ ────────► │  Server  │
+                         │  L4  Grab Detect     │           │  :19133  │
+  ┌──────────┐           │  L5  XUID Rep        │           └──────────┘
+  │  Ripper  │ ────X     │  L6  Max Conns       │
+  │  (Tool)  │  BLOCKED  │  L7  Behavior        │
+  └──────────┘           │  L8  Encryption      │
+                         │  L9  Post-Session    │
                          └──────────────────────┘
 ```
 
