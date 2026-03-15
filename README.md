@@ -1,5 +1,4 @@
 <p align="center">
-
   <img width="838" height="223" alt="packetguard banner" src="https://github.com/user-attachments/assets/7d55d330-183d-463b-8a4b-68c79477291f" />
 </p>
 
@@ -11,242 +10,134 @@
 </p>
 
 <p align="center">
-  <b>Reverse proxy that detects and blocks resource pack ripping tools for Minecraft Bedrock servers.</b><br/>
-  Sits between players and your BDS, inspects every handshake and packet stream, and shuts down extraction before packs leave the wire.
+  <b>Stop people stealing your resource packs.</b><br/>
+  Reverse proxy for Bedrock servers — sits in front of BDS, catches ripping tools, lets real players through.
 </p>
 
 <p align="center">
-  Built on <a href="https://github.com/sandertv/gophertunnel">gophertunnel</a> · GUI &amp; headless · Docker-ready
-</p>
-
-<p align="center">
+  Built on <a href="https://github.com/sandertv/gophertunnel">gophertunnel</a> · GUI &amp; headless · Docker-ready ·
   <a href="https://github.com/GodsApostles838/PackGuard/wiki"><img src="https://img.shields.io/badge/Wiki-Click_Me-EF4444?style=for-the-badge" alt="Wiki"/></a>
 </p>
 
 ---
 
-<h2>The Problem</h2>
+## Why this exists
 
-Bedrock clients receive resource packs during the login handshake. Tools like **bedrocktool** exploit this by using gophertunnel to complete the handshake, download pack data (including content keys from `TexturePackInfo`), and disconnect. To the server, it looks like a normal player that left early.
+Bedrock clients get resource packs during the login handshake. That's just how the protocol works. Tools like **bedrocktool** abuse this — they connect with gophertunnel, grab the packs (content keys included from `TexturePackInfo`), and bail. From your server's perspective it just looks like someone joined and left.
 
-**PackGuard proxies every connection and applies 9 layers of detection before, during, and after the session.**
+PackGuard sits between players and your BDS. Every connection goes through 9 detection layers before, during, and after the session. Rippers get blocked. Normal players don't notice it's there.
 
 ---
 
-<h2>Architecture</h2>
+## How it works
 
 ```
                          ┌──────────────────────┐
-                         │     PACKGUARD        │
-                         │     Reverse Proxy    │
-  ┌──────────┐           │                      │           ┌──────────┐
-  │  Player  │ ────────► │  L1  Fingerprint     │           │  Bedrock │
-  │ (Client) │   :19132  │  L2  URL Strip       │           │Dedicated │
-  └──────────┘           │  L3  Rate Limit      │ ────────► │  Server  │
-                         │  L4  Grab Detect     │           │  :19133  │
-  ┌──────────┐           │  L5  XUID Rep        │           └──────────┘
-  │  Ripper  │ ────X     │  L6  Max Conns       │
-  │  (Tool)  │  BLOCKED  │  L7  Behavior        │
-  └──────────┘           │  L8  Encryption      │
-                         │  L9  Post-Session    │
+                         │     PACKGUARD         │
+                         │     Reverse Proxy     │
+  ┌──────────┐           │                       │           ┌──────────┐
+  │  Player  │ ────────► │  L1  Fingerprint      │           │  Bedrock │
+  │ (Client) │   :19132  │  L2  URL Strip        │           │Dedicated │
+  └──────────┘           │  L3  Rate Limit       │ ────────► │  Server  │
+                         │  L4  Grab Detect      │           │  :19133  │
+  ┌──────────┐           │  L5  XUID Rep         │           └──────────┘
+  │  Ripper  │ ────X     │  L6  Max Conns        │
+  │  (Tool)  │  BLOCKED  │  L7  Behavior         │
+  └──────────┘           │  L8  Encryption        │
+                         │  L9  Post-Session      │
                          └──────────────────────┘
 ```
 
----
+Quick summary of each layer:
 
-<h2>Detection Layers</h2>
-
-| # | Stage | Detection |
+| # | When | What it does |
 |:---:|---|---|
-| **1** | `Pre-Handshake` | Fingerprint analysis — 16 weighted signals from ClientData / IdentityData |
-| **2** | `Handshake` | Download URL stripping — force chunked RakNet transfer through proxy |
-| **3** | `Pre-Handshake` | Per-IP rate limiting — block rapid reconnect cycles |
-| **4** | `Post-Session` | Grab-and-disconnect — flag clients that bail before spawning |
-| **5** | `Pre-Handshake` | XUID reputation — auto-block repeat offenders |
-| **6** | `Pre-Handshake` | Max concurrent connection cap |
-| **7** | `In-Game` | Behavioral analysis — tick rate, jitter, velocity, capability bitmask |
-| **8** | `Handshake` | Per-session AES-256 content keys with XUID distribution tracking |
-| **9** | `Post-Session` | Full session verdict — aggregated behavioral score + bot pattern match |
+| **1** | `Pre-Handshake` | Scores 16 signals from ClientData/IdentityData — catches gophertunnel defaults, spoofed devices, missing auth |
+| **2** | `Handshake` | Strips download URLs so packs have to transfer through the proxy, not direct from CDN |
+| **3** | `Pre-Handshake` | Rate limits per IP — stops rapid reconnect spam |
+| **4** | `Post-Session` | Flags clients that grab packs then disconnect before spawning |
+| **5** | `Pre-Handshake` | Tracks strikes per XUID — repeat offenders get auto-blocked |
+| **6** | `Pre-Handshake` | Caps concurrent connections so you don't get flooded |
+| **7** | `In-Game` | Watches tick rate, movement speed, jitter, interaction patterns |
+| **8** | `Handshake` | Unique AES-256 key per session — if a pack leaks you know exactly who |
+| **9** | `Post-Session` | Final verdict from everything above — aggregated score + known bot patterns |
 
 ---
 
-<h3>Layer 1 — Fingerprint Analysis</h3>
+## Fingerprinting (Layer 1)
 
-Every connecting client is scored across **16 weighted signals** extracted from `ClientData` and `IdentityData`. Clients above the threshold are disconnected **before** resource packs are sent.
+This is the first line of defence and catches most tools outright. Every connection gets scored across 16 weighted signals before any packs are sent:
 
 ```
-Signal                         Weight    Catches
+Signal                         Weight    Why
 ─────────────────────────────────────────────────────
-Empty DeviceModel (Android)    +4.0      gophertunnel default
-Classic UI on mobile           +2.0      impossible on real devices
-Mouse/KB input on Android      +2.0      input mode mismatch
-Missing PlatformOnlineID       +1.0      absent on spoofed clients
-Missing DeviceID               +1.5      absent on spoofed clients
-Missing SelfSignedID           +1.0      absent on spoofed clients
-DeviceOS = 0                   +3.0      unknown / unset platform
-DeviceOS = Dedicated           +5.0      server posing as client
-Zero-dimension skin            +2.0      no skin geometry
-Empty SkinData                 +2.0      no RGBA payload
-TrustedSkin = false            +1.0      not Xbox Live validated
-Empty XUID                     +2.0      unauthenticated
-Empty DisplayName              +1.0      empty identity
-MemoryTier = 0 (Android)       +1.0      gophertunnel default
+Empty DeviceModel (Android)    +4.0      gophertunnel doesn't set this
+Classic UI on mobile           +2.0      literally impossible on real phones
+Mouse/KB input on Android      +2.0      input mode doesn't match platform
+Missing PlatformOnlineID       +1.0      spoofed clients skip this
+Missing DeviceID               +1.5      same deal
+Missing SelfSignedID           +1.0      same deal
+DeviceOS = 0                   +3.0      unknown platform
+DeviceOS = Dedicated           +5.0      server pretending to be a client lol
+Zero-dimension skin            +2.0      no skin geometry at all
+Empty SkinData                 +2.0      no RGBA pixel data
+TrustedSkin = false            +1.0      not validated by Xbox Live
+Empty XUID                     +2.0      not authenticated
+Empty DisplayName              +1.0      no gamertag
+MemoryTier = 0 (Android)       +1.0      another gophertunnel default
 Unusual GUI Scale              +0.5      non-standard value
 Empty LanguageCode             +0.5      missing locale
 ─────────────────────────────────────────────────────
-Threshold (configurable)        5.0      default block score
+Default threshold               5.0      configurable
 ```
 
-Verdict logic:
-- **Score ≥ threshold** → `BLOCKED` — disconnected immediately
-- **Score ≥ threshold × 0.6** → `SUSPICIOUS` — logged, allowed through
-- **Below** → `CLEAN`
+Score hits threshold? Blocked before packs are even offered. Score hits 60% of threshold? Logged as suspicious but let through. Below that, clean.
 
 ---
 
-<h3>Layer 2 — Download URL Stripping</h3>
+## Behavioral analysis (Layers 7 + 9)
 
-Strips `DownloadURL` from all resource packs in the `ResourcePacksInfo` packet, forcing chunked RakNet transfer through the proxy instead of direct CDN downloads that bypass inspection entirely.
+For anything that makes it past fingerprinting, the proxy watches the actual gameplay session.
 
----
+**Tick rate** — Bedrock clients send `PlayerAuthInput` at 20 Hz. Below 5 Hz or above 40 Hz after 5 seconds of play = not a real client.
 
-<h3>Layer 3 — Rate Limiting</h3>
+**Jitter** — real humans have ~2-5ms standard deviation between ticks. Bots either have near-zero jitter (programmatic timing) or wildly erratic intervals. Both stand out.
 
-Sliding-window per-IP rate limiter. 1-minute window, configurable connections per minute. Catches tools that rapid-fire reconnect after being detected. Cleanup runs every 60 seconds.
+**Movement speed** — walking caps at 4.3 b/s, sprinting at 5.6, sprint+jump at 7.1. Anything over 20 b/s without a server teleport is physically impossible.
 
----
+**Capability bitmask** — 16 flags (movement, interaction, inventory, sprint, jump, emote, etc) packed into a uint64. Known bot patterns like zero-interaction or movement-only get matched after 30+ seconds. If someone's been connected for half a minute and hasn't done *anything* a normal player would do, that's a red flag.
 
-<h3>Layer 4 — Grab-and-Disconnect Detection</h3>
-
-```
-Normal Player:     Connect → Handshake → Packs → Spawn → Play → Disconnect
-                                                   ▲
-                                                   │ stayed past spawn
-
-Ripping Tool:      Connect → Handshake → Packs → Disconnect
-                                                   ▲
-                                                   │ never spawned (flagged)
-```
-
-If a client receives packs but disconnects before spawning within a configurable timeout (default 30s), the XUID is flagged. Combined with Layer 5 for repeat tracking.
+**Ghost clients** — 10+ seconds with zero `PlayerAuthInput` packets = instant block. Not even pretending to be a player at that point.
 
 ---
 
-<h3>Layer 5 — XUID Reputation</h3>
+## Grab-and-disconnect (Layer 4)
 
-Tracks strikes per XUID. After hitting the configurable threshold (default 3 strikes), the account is auto-blocked on future connections before packs are even offered. Bans auto-expire after 1 hour.
+```
+Real player:    Connect → Handshake → Packs → Spawn → Play → Disconnect
+Ripper:         Connect → Handshake → Packs → Disconnect  (never spawned)
+```
+
+If you disconnect within 30 seconds (configurable) without ever spawning, that gets flagged. Combined with the XUID reputation system — 3 strikes and you're auto-blocked on sight.
 
 ---
 
-<h3>Layer 6 — Max Connections</h3>
+## Content key tracking (Layer 8)
 
-Caps concurrent proxied connections (default 100) to prevent connection flooding and resource exhaustion.
-
----
-
-<h3>Layer 7 + 9 — Behavioral Analysis</h3>
-
-For players that make it into gameplay, the proxy inspects **every packet** in the client→server relay via `SessionMetrics`.
-
-#### Tick Rate Validation
-
-```
-Expected:    |────|────|────|────|────|────|    20 ticks/sec (50ms apart)
-
-Bot (fast):  |──|──|──|──|──|──|──|──|──|──|   40+ ticks/sec  → +5.0 score
-Bot (slow):  |────────|────────|────────|       < 5 ticks/sec  → +5.0 score
-```
-
-Bedrock clients send `PlayerAuthInput` at 20 Hz. Anything below 5 Hz or above 40 Hz after 5 seconds = automated client.
-
-#### Tick Jitter
-
-```
-Real Player:   48ms  52ms  49ms  53ms  47ms  51ms    stddev ~2-5ms  ✓
-Bot (rigid):   50ms  50ms  50ms  50ms  50ms  50ms    stddev < 0.5ms → +4.0 score
-Bot (erratic): 12ms  94ms  31ms  67ms   8ms  102ms   stddev > 25ms  → flagged
-```
-
-Standard deviation of `PlayerAuthInput` intervals over 30+ samples. Programmatic generation produces near-zero jitter. Requires mean interval > 10ms to avoid false positives.
-
-#### Velocity Validation
-
-```
-Movement Type        Max Speed (blocks/sec)
-─────────────────────────────────────────────
-Walking              4.3
-Sprinting            5.6
-Sprint + Jump        7.1
-─────────────────────────────────────────────
-Impossible (no TP)   > 20.0    ← +6.0 score
-```
-
-Horizontal speed from consecutive `PlayerAuthInput` positions. Anything above 20 b/s without a server teleport acknowledgment is physically impossible.
-
-#### Capability Bitmask
-
-16 behavioral flags packed into a `uint64` for O(1) pattern matching:
-
-```
-Bit   Flag              Bit   Flag
-───   ────              ───   ────
- 0    SentMovement       8    Emoted
- 1    SentInteract       9    BlockAction
- 2    SentInventory     10    ItemInteract
- 3    Sprinted          11    UsedTouch
- 4    Jumped            12    UsedGamepad
- 5    Sneaked           13    UsedMouse
- 6    Swam              14    Teleported
- 7    Glided            15    RodeVehicle
-```
-
-**Known bot patterns:**
-
-| Pattern | Mask | Expected | Catches |
-|---|---|---|---|
-| `passive_observer` | Movement \| Interact \| Inventory | `0x000` (none set) | Zero-interaction bots |
-| `input_only_bot` | Movement \| Sprint \| Jump \| Sneak | Movement only | Moves but never does anything |
-
-After 30+ seconds, if the bitmask matches a known signature → **+3.0 score**.
-
-#### Ghost Client Detection
-
-If a session reaches 10+ seconds with `AuthInputCount == 0` (no `PlayerAuthInput` ever sent), it's a ghost client → **+10.0 score** (instant block).
+Every session gets a unique 32-byte AES-256 key via `crypto/rand`. The key + XUID + timestamp gets logged. If someone leaks a decrypted pack, you look up which key decrypted it and trace it back to the exact account. Log holds up to 10k entries.
 
 ---
 
-<h3>Layer 8 — Content Key Tracking</h3>
-
-```
-Session A (PlayerOne):   Pack "abc-123" → ContentKey: a7f3...9e2b → logged
-Session B (PlayerTwo):   Pack "abc-123" → ContentKey: d1c8...4f7a → logged
-                                    ▲
-                                    │ unique AES-256 key per session per XUID
-
-Leaked pack found with key a7f3...9e2b  →  traced back to PlayerOne
-```
-
-Generates unique 32-byte AES-256 content keys per session via `crypto/rand`. Every key distribution is logged per-XUID with timestamps. Distribution log holds up to 10,000 entries. If a decrypted pack surfaces, you trace it to exactly which account extracted it.
-
----
-
-<h2>Quick Start</h2>
-
-### Build
+## Quick start
 
 ```bash
 go build -o packguard .
-```
-
-### First Run
-
-```bash
 ./packguard
 ```
 
-On first run with no config present, PackGuard writes a default `packguard.yaml` and exits. Edit it, then run again.
+First run with no config writes a default `packguard.yaml` and exits. Edit it, run again.
 
-### Configuration
+### Config
 
 ```yaml
 listen: "0.0.0.0:19132"
@@ -273,59 +164,44 @@ log:
 ```
 
 <details>
-<summary><b>Configuration Reference</b></summary>
+<summary><b>Full config reference</b></summary>
 
-| Field | Type | Default | Description |
+| Field | Type | Default | What it does |
 |---|:---:|:---:|---|
-| `listen` | string | `0.0.0.0:19132` | Address the proxy listens on. Players connect here. |
-| `auth_disabled` | bool | `false` | Disable Xbox Live auth (testing only). |
-| `backend.address` | string | `127.0.0.1:19133` | Your actual BDS address. |
-| `detection.threshold` | float | `5.0` | Score needed to block. Lower = stricter. |
-| `detection.block_on_detect` | bool | `true` | Disconnect flagged clients or just log. |
-| `detection.disconnect_message` | string | — | Message shown to blocked players. |
-| `detection.rate_limit` | int | `5` | Max connections per IP per minute. |
-| `detection.max_connections` | int | `100` | Max concurrent proxied connections. |
-| `detection.repeat_block_count` | int | `3` | Strikes before XUID is auto-blocked. |
-| `detection.grab_disconnect_timeout` | int | `30` | Seconds — disconnect before spawn = flagged. |
-| `detection.encrypt_packs` | bool | `false` | Generate per-session AES-256 content keys. |
-| `detection.whitelist` | []string | — | XUIDs that bypass fingerprint analysis. |
-| `log.file` | string | `packguard.log` | Path for JSON Lines audit log. |
-| `log.verbose` | bool | `false` | Log clean connections too. |
+| `listen` | string | `0.0.0.0:19132` | Port players connect to |
+| `auth_disabled` | bool | `false` | Skip Xbox Live auth (don't do this in prod) |
+| `backend.address` | string | `127.0.0.1:19133` | Your actual BDS |
+| `detection.threshold` | float | `5.0` | Fingerprint score to block at. Lower = stricter |
+| `detection.block_on_detect` | bool | `true` | Actually disconnect or just log |
+| `detection.disconnect_message` | string | — | What blocked players see |
+| `detection.rate_limit` | int | `5` | Connections per IP per minute |
+| `detection.max_connections` | int | `100` | Total concurrent connections |
+| `detection.repeat_block_count` | int | `3` | Strikes before auto-block |
+| `detection.grab_disconnect_timeout` | int | `30` | Seconds before no-spawn = flagged |
+| `detection.encrypt_packs` | bool | `false` | Per-session AES-256 keys |
+| `detection.whitelist` | []string | — | XUIDs that skip fingerprinting |
+| `log.file` | string | `packguard.log` | Log file path |
+| `log.verbose` | bool | `false` | Log clean connections too |
 
 </details>
 
 ---
 
-<h2>Running</h2>
+## Running
 
-### Headless
-
-For servers, Docker, or any headless environment:
-
+**Headless** (servers, Docker, CI):
 ```bash
 ./packguard -headless
 ```
 
-```
-  PACKGUARD v1.0.0
-  0.0.0.0:19132  →  127.0.0.1:19133
-
-[14:23:01]  BLOCKED  SkidPlayer123    192.168.1.50  (score: 9.0)
-[14:23:05]  ALLOWED  LegitPlayer      192.168.1.51
-[14:23:08]  GRAB     SomeUser disconnected before spawn (2.3s)
-[14:24:01]  STATS    blocked: 1  allowed: 1  total: 2
-```
-
-### GUI
-
-Default mode on desktop. Opens a Fyne window with live connection log, signal breakdown, and stats.
-
+**GUI** (desktop, default):
 ```bash
 ./packguard
 ```
 
-### Docker
+Fyne window with live connection log, signal breakdowns, stats.
 
+**Docker**:
 ```dockerfile
 FROM golang:1.24-alpine AS build
 WORKDIR /src
@@ -338,65 +214,62 @@ COPY packguard.yaml /etc/packguard/packguard.yaml
 ENTRYPOINT ["packguard", "-headless", "-config", "/etc/packguard/packguard.yaml"]
 ```
 
-### Deployment
-
+**Deployment is just**:
 ```
 Players  →  PackGuard (:19132)  →  BDS (:19133)
 ```
 
-Point `listen` to the port players connect on. Point `backend.address` to your BDS. Set `auth_disabled: false` for production so Xbox Live auth is enforced through the proxy.
+Point players at PackGuard's port. Point PackGuard at your BDS. Done.
 
 ---
 
-<h2>Flags</h2>
+## CLI flags
 
 ```
--headless       Run without GUI
--config PATH    Path to YAML config (default: packguard.yaml)
--version        Print version and exit
+-headless       No GUI
+-config PATH    Config file (default: packguard.yaml)
+-version        Print version
 ```
 
 ---
 
-<h2>Logging</h2>
+## Logs
 
-All events are written as JSON Lines to the configured log file:
+JSON Lines to the configured log file:
 
 ```json
 {"time":"2025-01-15T14:23:01Z","type":"blocked","xuid":"2535416...","username":"SkidPlayer123","ip":"192.168.1.50","score":9.0,"signals":["Device Model","UI Profile","Input Mode"]}
 ```
-
 ```json
 {"time":"2025-01-15T14:23:08Z","type":"grab_disconnect","xuid":"2535416...","username":"SomeUser","duration_sec":2.3}
 ```
-
 ```json
 {"time":"2025-01-15T14:24:30Z","type":"ghost_client","xuid":"2535416...","username":"BotAccount","verdict":"ghost_client","hz":0,"velocity":0,"caps":"0x0"}
 ```
 
 ---
 
-<h2>Project Structure</h2>
+## Project layout
 
 ```
 packguard/
-├── main.go                 Entry point, flag parsing, GUI / headless routing
+├── main.go                 entrypoint, flags, GUI/headless routing
 ├── config/
-│   └── config.go           YAML loading, validation, defaults
+│   └── config.go           YAML loading + defaults
 ├── detect/
-│   ├── fingerprint.go      16-signal scoring engine (ClientData + IdentityData)
-│   └── behavior.go         SessionMetrics — tick rate, jitter, velocity, bitmask
+│   ├── fingerprint.go      16-signal scoring engine
+│   └── behavior.go         tick rate, jitter, velocity, bitmask
 ├── proxy/
-│   ├── proxy.go            Core reverse proxy, connection handling, packet relay
-│   ├── encryption.go       PackTracker, AES-256 key generation, distribution log
-│   ├── logger.go           JSON Lines file logger
-│   └── ratelimit.go        Per-IP rate limiter, XUID reputation tracker
+│   ├── proxy.go            reverse proxy + packet relay
+│   ├── encryption.go       AES-256 key gen + distribution log
+│   ├── logger.go           JSON Lines logger
+│   └── ratelimit.go        rate limiter + XUID reputation
 ├── ui/
-│   ├── gui.go              Fyne desktop GUI
-│   ├── headless.go         Terminal output mode
-│   └── events.go           Event type definitions
-├── gophertunnel-fork/      Forked gophertunnel with proxy-specific patches
-└── packguard.yaml          Configuration
+│   ├── gui.go              Fyne GUI
+│   ├── headless.go         terminal mode
+│   └── events.go           event types
+├── gophertunnel-fork/      patched gophertunnel
+└── packguard.yaml          config
 ```
 
 ---
