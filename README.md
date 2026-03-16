@@ -22,7 +22,7 @@
 
 ## Why this exists
 
-Bedrock's resource pack system is fundamentally broken from a security standpoint. During the login handshake the server sends a `ResourcePacksInfo` packet that contains the pack UUIDs, sizes, and — critically — content keys in plaintext via `TexturePackInfo`. The client needs these to decrypt the packs after download. There's no way around it, that's just how Mojang built the protocol.
+Bedrock's resource pack system is fundamentally broken from a security standpoint. During the login handshake the server sends a `ResourcePacksInfo` packet that contains the pack UUIDs, sizes, and the content keys in plaintext via `TexturePackInfo`. The client needs these to decrypt the packs after download. There's no way around it, that's just how Mojang built the protocol.
 
 Tools like **bedrocktool** exploit this. They use gophertunnel to complete a legitimate handshake, receive the `ResourcePacksInfo` + `ResourcePackDataInfo` packets, download every chunk, and disconnect. The whole process takes about 2-3 seconds. Your server sees a normal join followed by an early leave. You'd never know anything happened unless you were specifically watching session durations.
 
@@ -31,7 +31,7 @@ The core issue is that BDS has zero awareness of *why* a client is connecting. I
 
 ## How it works
 
-PackGuard binds to a port (default `:19132`), accepts RakNet connections, and opens a mirrored connection to your actual BDS (default `:19133`). Every packet flows through the proxy in both directions. The proxy doesn't modify game traffic for legitimate players — it just watches.
+PackGuard binds to a port (default `:19132`), accepts RakNet connections, and opens a mirrored connection to your actual BDS (default `:19133`). Every packet flows through the proxy in both directions. The proxy doesn't modify game traffic for legitimate players, it just watches.
 
 ```
                          ┌──────────────────────┐
@@ -52,28 +52,28 @@ PackGuard binds to a port (default `:19132`), accepts RakNet connections, and op
 
 Detection happens at three stages of a connection's lifecycle:
 
-**Before packs are sent** (L1, L3, L5, L6) — fingerprint scoring, rate limiting, reputation check, connection cap. If any of these trip, the client gets disconnected before `ResourcePacksInfo` is ever forwarded. No packs exposed.
+**Before packs are sent** (L1, L3, L5, L6): fingerprint scoring, rate limiting, reputation check, connection cap. If any of these trip, the client gets disconnected before `ResourcePacksInfo` is ever forwarded. No packs exposed.
 
-**During the handshake** (L2, L8) — download URLs get stripped from pack entries so the client can't just `GET` the CDN link directly. If encryption is enabled, each session gets unique AES-256 content keys so you can trace leaks to a specific XUID.
+**During the handshake** (L2, L8): download URLs get stripped from pack entries so the client can't just `GET` the CDN link directly. If encryption is enabled, each session gets unique AES-256 content keys so you can trace leaks to a specific XUID.
 
-**During and after gameplay** (L4, L7, L9) — behavioral monitoring runs for the entire session. Tick rate, movement physics, interaction patterns, session duration. The post-session verdict combines all the behavioral scores into a final call.
+**During and after gameplay** (L4, L7, L9): behavioral monitoring runs for the entire session. Tick rate, movement physics, interaction patterns, session duration. The post-session verdict combines all the behavioral scores into a final call.
 
 | # | When | What it does |
 |:---:|---|---|
-| **1** | `Pre-Handshake` | Scores 16 signals from ClientData/IdentityData — catches gophertunnel defaults, spoofed devices, missing auth |
+| **1** | `Pre-Handshake` | Scores 16 signals from ClientData/IdentityData, catches gophertunnel defaults, spoofed devices, missing auth |
 | **2** | `Handshake` | Strips download URLs so packs have to transfer through the proxy, not direct from CDN |
-| **3** | `Pre-Handshake` | Rate limits per IP — stops rapid reconnect spam |
+| **3** | `Pre-Handshake` | Rate limits per IP, stops rapid reconnect spam |
 | **4** | `Post-Session` | Flags clients that grab packs then disconnect before spawning |
-| **5** | `Pre-Handshake` | Tracks strikes per XUID — repeat offenders get auto-blocked |
+| **5** | `Pre-Handshake` | Tracks strikes per XUID, repeat offenders get auto-blocked |
 | **6** | `Pre-Handshake` | Caps concurrent connections so you don't get flooded |
 | **7** | `In-Game` | Watches tick rate, movement speed, jitter, interaction patterns |
-| **8** | `Handshake` | Unique AES-256 key per session — if a pack leaks you know exactly who |
-| **9** | `Post-Session` | Final verdict from everything above — aggregated behavioral score + bot pattern match |
+| **8** | `Handshake` | Unique AES-256 key per session, if a pack leaks you know exactly who |
+| **9** | `Post-Session` | Final verdict from everything above, aggregated behavioral score + bot pattern match |
 
 
 ## Fingerprinting (Layer 1)
 
-This is where most rippers die. When a Bedrock client connects, it sends `ClientData` and `IdentityData` as part of the login JWT chain. Real clients (Windows 10, iOS, Android, Xbox, Switch, PS) populate these fields from actual hardware and OS APIs. Gophertunnel and similar libraries don't — they either leave fields empty or fill them with values that don't make physical sense.
+This is where most rippers die. When a Bedrock client connects, it sends `ClientData` and `IdentityData` as part of the login JWT chain. Real clients (Windows 10, iOS, Android, Xbox, Switch, PS) populate these fields from actual hardware and OS APIs. Gophertunnel and similar libraries don't, they either leave fields empty or fill them with values that don't make physical sense.
 
 The fingerprint engine in `detect/fingerprint.go` pulls 16 fields and scores them:
 
@@ -97,61 +97,61 @@ The fingerprint engine in `detect/fingerprint.go` pulls 16 fields and scores the
 | Empty LanguageCode | +0.5 | missing locale |
 | **Default threshold** | **5.0** | configurable |
 
-The weights aren't random. `DeviceOS = Dedicated` is +5.0 because there is literally no scenario where a dedicated server binary connects as a client — that's a guaranteed bot. `Empty DeviceModel` on Android is +4.0 because every real Android device reports a model string from `Build.MODEL`, but gophertunnel's `login.ClientData` struct initialises it as `""`. A real phone would never do that.
+The weights aren't random. `DeviceOS = Dedicated` is +5.0 because there is literally no scenario where a dedicated server binary connects as a client, that's a guaranteed bot. `Empty DeviceModel` on Android is +4.0 because every real Android device reports a model string from `Build.MODEL`, but gophertunnel's `login.ClientData` struct initialises it as `""`. A real phone would never do that.
 
 The scoring uses three tiers:
-- **Score >= threshold** — `BLOCKED`, disconnected before packs are sent
-- **Score >= threshold * 0.6** — `SUSPICIOUS`, logged but allowed through (useful for tuning)
-- **Below** — `CLEAN`
+- **Score >= threshold**: `BLOCKED`, disconnected before packs are sent
+- **Score >= threshold * 0.6**: `SUSPICIOUS`, logged but allowed through (useful for tuning)
+- **Below**: `CLEAN`
 
 The 0.6x band exists so you can review near-misses in your logs and adjust the threshold. If you're seeing a lot of `SUSPICIOUS` entries from legit players on weird devices, bump the threshold up. If rippers are sliding through at 4.9, drop it.
 
 
 ## Behavioral analysis (Layers 7 + 9)
 
-Fingerprinting catches the lazy tools. But if someone forks gophertunnel and starts spoofing ClientData properly, you need a second line. That's what `detect/behavior.go` does — it watches the actual packet stream after the player joins.
+Fingerprinting catches the lazy tools. But if someone forks gophertunnel and starts spoofing ClientData properly, you need a second line. That's what `detect/behavior.go` does, it watches the actual packet stream after the player joins.
 
 Every proxied session has a `SessionMetrics` struct that accumulates data from `PlayerAuthInput` packets in real time:
 
-**Tick rate** — Bedrock clients send `PlayerAuthInput` at 20 Hz (once every 50ms). This is hardcoded in the client, you can't change it. The proxy counts packets over a rolling window. Below 5 Hz or above 40 Hz after the first 5 seconds = automated. We wait 5 seconds because real clients can stutter briefly on join while chunks load.
+**Tick rate**: Bedrock clients send `PlayerAuthInput` at 20 Hz (once every 50ms). This is hardcoded in the client, you can't change it. The proxy counts packets over a rolling window. Below 5 Hz or above 40 Hz after the first 5 seconds = automated. We wait 5 seconds because real clients can stutter briefly on join while chunks load.
 
-**Tick jitter** — this is the one that's hard to fake. Real human input has natural variance in packet timing — network jitter, OS scheduling, the client's own frame timing. Standard deviation across 30+ samples lands around 2-5ms for a real player. Bots using `time.Sleep(50 * time.Millisecond)` produce near-zero stddev because Go's scheduler is too consistent. Bots using random delays tend to overshoot and get stddev > 25ms. Both patterns are detectable. We require mean interval > 10ms before scoring to avoid false positives on clients that batch-send on reconnect.
+**Tick jitter**: this is the one that's hard to fake. Real human input has natural variance in packet timing, network jitter, OS scheduling, the client's own frame timing. Standard deviation across 30+ samples lands around 2-5ms for a real player. Bots using `time.Sleep(50 * time.Millisecond)` produce near-zero stddev because Go's scheduler is too consistent. Bots using random delays tend to overshoot and get stddev > 25ms. Both patterns are detectable. We require mean interval > 10ms before scoring to avoid false positives on clients that batch-send on reconnect.
 
-**Movement speed** — consecutive `PlayerAuthInput` packets contain position vectors. We compute horizontal displacement per tick. Walking caps at 4.3 blocks/sec, sprinting at 5.6, sprint+jump at 7.1. These are Bedrock's actual physics constants. Anything over 20 b/s without a preceding server teleport packet (`MovePlayer` with mode `Teleport`) is physically impossible — no elytra, no riptide, nothing gets you there legitimately.
+**Movement speed**: consecutive `PlayerAuthInput` packets contain position vectors. We compute horizontal displacement per tick. Walking caps at 4.3 blocks/sec, sprinting at 5.6, sprint+jump at 7.1. These are Bedrock's actual physics constants. Anything over 20 b/s without a preceding server teleport packet (`MovePlayer` with mode `Teleport`) is physically impossible, no elytra, no riptide, nothing gets you there legitimately.
 
-**Capability bitmask** — 16 behavioral flags packed into a `uint64`. Every time a player sprints, jumps, interacts, opens inventory, uses touch input, etc., the corresponding bit gets set. After 30+ seconds, if the bitmask matches a known bot signature (like zero interaction, or movement-only with no jumps/sneaks), that's +3.0 to the score. Real players *do things*. Bots that just idle or walk in straight lines don't.
+**Capability bitmask**: 16 behavioral flags packed into a `uint64`. Every time a player sprints, jumps, interacts, opens inventory, uses touch input, etc., the corresponding bit gets set. After 30+ seconds, if the bitmask matches a known bot signature (like zero interaction, or movement-only with no jumps/sneaks), that's +3.0 to the score. Real players *do things*. Bots that just idle or walk in straight lines don't.
 
-**Ghost clients** — if 10+ seconds pass and `AuthInputCount` is still 0 (the client hasn't sent a single `PlayerAuthInput`), that's a +10.0 instant block. At that point the "player" is just holding the connection open without participating in the game at all. No legitimate client does this.
+**Ghost clients**: if 10+ seconds pass and `AuthInputCount` is still 0 (the client hasn't sent a single `PlayerAuthInput`), that's a +10.0 instant block. At that point the "player" is just holding the connection open without participating in the game at all. No legitimate client does this.
 
 The Layer 9 post-session verdict fires on disconnect. It takes the accumulated behavioral scores, checks for grab-and-disconnect (Layer 4), and produces the final log entry.
 
 
 ## Grab-and-disconnect (Layer 4)
 
-This is the simplest and most reliable signal. Normal players connect, get packs, spawn into the world, walk around, disconnect eventually. Ripping tools connect, get packs, and disconnect immediately — usually within 2-3 seconds, always before the spawn sequence completes.
+This is the simplest and most reliable signal. Normal players connect, get packs, spawn into the world, walk around, disconnect eventually. Ripping tools connect, get packs, and disconnect immediately, usually within 2-3 seconds, always before the spawn sequence completes.
 
 ```
 Real player:    Connect → Handshake → Packs → Spawn → Play → Disconnect
 Ripper:         Connect → Handshake → Packs → Disconnect  (never spawned)
 ```
 
-If a client receives resource pack data but disconnects within 30 seconds (configurable) without the proxy ever seeing a spawn confirmation, the XUID gets a strike. This feeds into Layer 5 — after 3 strikes (configurable), the XUID is auto-blocked on future connections before packs are even offered. Bans auto-expire after 1 hour so legitimate players who happened to crash during loading aren't permanently locked out.
+If a client receives resource pack data but disconnects within 30 seconds (configurable) without the proxy ever seeing a spawn confirmation, the XUID gets a strike. This feeds into Layer 5, after 3 strikes (configurable), the XUID is auto-blocked on future connections before packs are even offered. Bans auto-expire after 1 hour so legitimate players who happened to crash during loading aren't permanently locked out.
 
-The timeout exists because real players *can* disconnect during loading — maybe they fat-fingered the back button, maybe their wifi dropped. One disconnect isn't suspicious. Three in a row from the same Xbox account is.
+The timeout exists because real players *can* disconnect during loading, maybe they fat-fingered the back button, maybe their wifi dropped. One disconnect isn't suspicious. Three in a row from the same Xbox account is.
 
 
 ## URL stripping (Layer 2)
 
-When BDS sends `ResourcePacksInfo`, each pack entry can include a `DownloadURL` field. If set, the client downloads the pack directly from that URL (usually a CDN) instead of requesting chunks through the RakNet connection. This is faster for large packs but completely bypasses the proxy — the client just does a plain HTTP GET and PackGuard never sees the traffic.
+When BDS sends `ResourcePacksInfo`, each pack entry can include a `DownloadURL` field. If set, the client downloads the pack directly from that URL (usually a CDN) instead of requesting chunks through the RakNet connection. This is faster for large packs but completely bypasses the proxy, the client just does a plain HTTP GET and PackGuard never sees the traffic.
 
-Layer 2 strips this field from every pack entry before forwarding the packet. The client falls back to chunked RakNet transfer, which flows through the proxy where it can be monitored and rate-limited. This is also what makes Layer 8 encryption possible — you can't encrypt a CDN download with per-session keys.
+Layer 2 strips this field from every pack entry before forwarding the packet. The client falls back to chunked RakNet transfer, which flows through the proxy where it can be monitored and rate-limited. This is also what makes Layer 8 encryption possible since you can't encrypt a CDN download with per-session keys.
 
 
 ## Content key tracking (Layer 8)
 
 This one's optional (`encrypt_packs: false` by default) because it adds overhead, but it's the nuclear option for tracking leaks. When enabled, PackGuard generates a unique 32-byte AES-256 key per session per pack via `crypto/rand`. The key gets injected into the pack's content key field in `TexturePackInfo` and logged alongside the XUID and timestamp in `proxy/encryption.go`.
 
-The distribution log holds up to 10,000 entries in a ring buffer. If a decrypted resource pack shows up on some Discord server, you extract the content key from the pack header, grep your log, and you know exactly which Xbox account downloaded it and when. It's forensic evidence, not prevention — but sometimes knowing *who* is enough.
+The distribution log holds up to 10,000 entries in a ring buffer. If a decrypted resource pack shows up on some Discord server, you extract the content key from the pack header, grep your log, and you know exactly which Xbox account downloaded it and when. It's forensic evidence, not prevention, but sometimes knowing *who* is enough.
 
 
 ## Quick start
@@ -199,13 +199,13 @@ log:
 | `backend.address` | string | `127.0.0.1:19133` | Your actual BDS |
 | `detection.threshold` | float | `5.0` | Fingerprint score to block at. Lower = stricter |
 | `detection.block_on_detect` | bool | `true` | Actually disconnect or just log |
-| `detection.disconnect_message` | string | — | What blocked players see |
+| `detection.disconnect_message` | string | | What blocked players see |
 | `detection.rate_limit` | int | `5` | Connections per IP per minute |
 | `detection.max_connections` | int | `100` | Total concurrent connections |
 | `detection.repeat_block_count` | int | `3` | Strikes before auto-block |
 | `detection.grab_disconnect_timeout` | int | `30` | Seconds before no-spawn = flagged |
 | `detection.encrypt_packs` | bool | `false` | Per-session AES-256 keys |
-| `detection.whitelist` | []string | — | XUIDs that skip fingerprinting |
+| `detection.whitelist` | []string | | XUIDs that skip fingerprinting |
 | `log.file` | string | `packguard.log` | Log file path |
 | `log.verbose` | bool | `false` | Log clean connections too |
 
