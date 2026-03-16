@@ -77,28 +77,25 @@ This is where most rippers die. When a Bedrock client connects, it sends `Client
 
 The fingerprint engine in `detect/fingerprint.go` pulls 16 fields and scores them:
 
-```
-Signal                         Weight    Why
-─────────────────────────────────────────────────────
-Empty DeviceModel (Android)    +4.0      gophertunnel doesn't set this
-Classic UI on mobile           +2.0      literally impossible on real phones
-Mouse/KB input on Android      +2.0      input mode doesn't match platform
-Missing PlatformOnlineID       +1.0      spoofed clients skip this
-Missing DeviceID               +1.5      same deal
-Missing SelfSignedID           +1.0      same deal
-DeviceOS = 0                   +3.0      unknown platform
-DeviceOS = Dedicated           +5.0      server pretending to be a client lol
-Zero-dimension skin            +2.0      no skin geometry at all
-Empty SkinData                 +2.0      no RGBA pixel data
-TrustedSkin = false            +1.0      not validated by Xbox Live
-Empty XUID                     +2.0      not authenticated
-Empty DisplayName              +1.0      no gamertag
-MemoryTier = 0 (Android)       +1.0      another gophertunnel default
-Unusual GUI Scale              +0.5      non-standard value
-Empty LanguageCode             +0.5      missing locale
-─────────────────────────────────────────────────────
-Default threshold               5.0      configurable
-```
+| Signal | Weight | Why |
+|---|:---:|---|
+| Empty DeviceModel (Android) | +4.0 | gophertunnel doesn't set this |
+| Classic UI on mobile | +2.0 | literally impossible on real phones |
+| Mouse/KB input on Android | +2.0 | input mode doesn't match platform |
+| Missing PlatformOnlineID | +1.0 | spoofed clients skip this |
+| Missing DeviceID | +1.5 | same deal |
+| Missing SelfSignedID | +1.0 | same deal |
+| DeviceOS = 0 | +3.0 | unknown platform |
+| DeviceOS = Dedicated | +5.0 | server pretending to be a client lol |
+| Zero-dimension skin | +2.0 | no skin geometry at all |
+| Empty SkinData | +2.0 | no RGBA pixel data |
+| TrustedSkin = false | +1.0 | not validated by Xbox Live |
+| Empty XUID | +2.0 | not authenticated |
+| Empty DisplayName | +1.0 | no gamertag |
+| MemoryTier = 0 (Android) | +1.0 | another gophertunnel default |
+| Unusual GUI Scale | +0.5 | non-standard value |
+| Empty LanguageCode | +0.5 | missing locale |
+| **Default threshold** | **5.0** | configurable |
 
 The weights aren't random. `DeviceOS = Dedicated` is +5.0 because there is literally no scenario where a dedicated server binary connects as a client — that's a guaranteed bot. `Empty DeviceModel` on Android is +4.0 because every real Android device reports a model string from `Build.MODEL`, but gophertunnel's `login.ClientData` struct initialises it as `""`. A real phone would never do that.
 
