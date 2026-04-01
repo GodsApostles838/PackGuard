@@ -11,7 +11,7 @@
 
 <p align="center">
   <b>Stop people stealing your resource packs.</b><br/>
-  Reverse proxy for Bedrock servers, sits in front of BDS, catches ripping tools, lets real players through.
+  Reverse proxy for Bedrock servers, sits in front of BDS or any server, configure and edit to your liking, catches tools, lets real players through.
 </p>
 
 <p align="center">
