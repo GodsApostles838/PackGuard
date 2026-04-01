@@ -34,7 +34,7 @@ The core issue is that BDS has zero awareness of *why* a client is connecting. I
 PackGuard binds to a port (default `:19132`), accepts RakNet connections, and opens a mirrored connection to your actual BDS (default `:19133`). Every packet flows through the proxy in both directions. The proxy doesn't modify game traffic for legitimate players, it just watches.
 
 ```
-                         ┌──────────────────────┐
+                         ┌───────────────────────┐
                          │     PACKGUARD         │
                          │     Reverse Proxy     │
   ┌──────────┐           │                       │           ┌──────────┐
@@ -45,9 +45,9 @@ PackGuard binds to a port (default `:19132`), accepts RakNet connections, and op
   ┌──────────┐           │  L5  XUID Rep         │           └──────────┘
   │  Ripper  │ ────X     │  L6  Max Conns        │
   │  (Tool)  │  BLOCKED  │  L7  Behavior         │
-  └──────────┘           │  L8  Encryption        │
-                         │  L9  Post-Session      │
-                         └──────────────────────┘
+  └──────────┘           │  L8  Encryption       │
+                         │  L9  Post-Session     │
+                         └───────────────────────┘
 ```
 
 Detection happens at three stages of a connection's lifecycle:
