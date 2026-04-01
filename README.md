@@ -43,7 +43,7 @@ PackGuard binds to a port (default `:19132`), accepts RakNet connections, and op
   └──────────┘           │  L3  Rate Limit       │ ────────► │  Server  │
                          │  L4  Grab Detect      │           │  :19133  │
   ┌──────────┐           │  L5  XUID Rep         │           └──────────┘
-  │  Ripper  │ ────X     │  L6  Max Conns        │
+  │   Tool   │ ────X     │  L6  Max Conns        │
   │  (Tool)  │  BLOCKED  │  L7  Behavior         │
   └──────────┘           │  L8  Encryption       │
                          │  L9  Post-Session     │
